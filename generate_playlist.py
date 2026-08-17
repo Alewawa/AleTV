@@ -17,6 +17,7 @@ Criterios:
 - Mantiene deportes de Peru, Latinoamerica y Espana.
 - Elimina duplicados por tvg-id; si falta, usa nombre normalizado.
 - Conserva la mejor señal disponible.
+- Si un canal peruano tiene varias URLs, prueba cuales responden antes de elegir.
 - Excluye [Geo-blocked], [Not 24/7] y [Offline].
 - Prioriza los canales peruanos mas comunes.
 - En Deportes Latinoamerica prioriza marcas conocidas como TyC Sports,
@@ -52,6 +53,7 @@ Salida:
 
 from __future__ import annotations
 
+import concurrent.futures
 import ipaddress
 import re
 import unicodedata
@@ -193,6 +195,16 @@ BLOCKED_MARKERS = (
     "[geo-blocked]",
     "[not 24/7]",
     "[offline]",
+)
+
+# Cuando un canal peruano tiene varias URLs, probamos las alternativas antes
+# de elegir una. Esto evita seleccionar una senal 1080p que ya no responde
+# solo porque tiene mayor resolucion declarada.
+PROBE_TIMEOUT = 6
+PROBE_WORKERS = 12
+DEFAULT_USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36"
 )
 
 
@@ -362,6 +374,68 @@ def quality_score(entry: Entry) -> int:
     return score
 
 
+def stream_request_headers(entry: Entry) -> dict[str, str]:
+    headers = {
+        "User-Agent": DEFAULT_USER_AGENT,
+        "Accept": "application/vnd.apple.mpegurl, application/x-mpegURL, */*",
+        "Connection": "close",
+    }
+
+    for line in entry.extra_lines:
+        lower = line.lower()
+        if lower.startswith("#extvlcopt:http-user-agent="):
+            headers["User-Agent"] = line.split("=", 1)[1].strip()
+        elif lower.startswith("#extvlcopt:http-referrer="):
+            headers["Referer"] = line.split("=", 1)[1].strip()
+        elif lower.startswith("#extvlcopt:http-referer="):
+            headers["Referer"] = line.split("=", 1)[1].strip()
+
+    return headers
+
+
+def probe_stream(entry: Entry) -> bool:
+    """Comprueba rapidamente si una URL responde como stream/playlist."""
+    try:
+        req = urllib.request.Request(
+            entry.url,
+            headers=stream_request_headers(entry),
+            method="GET",
+        )
+        with urllib.request.urlopen(req, timeout=PROBE_TIMEOUT) as response:
+            status = getattr(response, "status", 200) or 200
+            if status >= 400:
+                return False
+
+            content_type = response.headers.get("Content-Type", "").lower()
+            data = response.read(4096)
+            if not data:
+                return False
+
+            lower = data.lower()
+            if b"<html" in lower or b"access denied" in lower or b"forbidden" in lower:
+                return False
+
+            url_path = urllib.parse.urlsplit(entry.url).path.lower()
+            if url_path.endswith(".m3u8") or "mpegurl" in content_type:
+                return b"#extm3u" in lower or b"#ext-x-" in lower or b"#extinf" in lower
+
+            return True
+    except Exception:
+        return False
+
+
+def should_probe_group(candidates: list[Entry]) -> bool:
+    # Solo validamos activamente Peru y Arequipa. Para deportes extranjeros
+    # no conviene filtrar desde GitHub, porque algunos streams pueden tener
+    # restricciones segun la ubicacion del runner.
+    return any(
+        e.base_tvg_id in NATIONAL_TV_IDS
+        or e.base_tvg_id in PERU_SPORTS_IDS
+        or "arequipa" in e.origins
+        for e in candidates
+    )
+
+
 def clean_visible_name(name: str) -> str:
     name = re.sub(
         r"\s*\((?:2160p|1440p|1080p|1080i|720p|576p|576i|540p|480p|480i|360p|240p|"
@@ -420,25 +494,48 @@ def sports_region(entry: Entry) -> str | None:
 
 
 def choose_best(entries: list[Entry]) -> list[Entry]:
-    best: dict[str, Entry] = {}
-
+    grouped: dict[str, list[Entry]] = {}
     for entry in entries:
-        key = canonical_key(entry)
+        grouped.setdefault(canonical_key(entry), []).append(entry)
 
-        if key not in best:
-            best[key] = entry
-            continue
+    # Solo hace falta probar canales que tengan alternativas.
+    probe_candidates: list[Entry] = []
+    for candidates in grouped.values():
+        if len(candidates) > 1 and should_probe_group(candidates):
+            probe_candidates.extend(candidates)
 
-        current = best[key]
-        origins = current.origins | entry.origins
+    health: dict[str, bool] = {}
+    if probe_candidates:
+        print(f"Probando {len(probe_candidates)} URLs alternativas de Peru/Arequipa...")
+        with concurrent.futures.ThreadPoolExecutor(max_workers=PROBE_WORKERS) as pool:
+            future_map = {pool.submit(probe_stream, e): e for e in probe_candidates}
+            for future in concurrent.futures.as_completed(future_map):
+                entry = future_map[future]
+                try:
+                    health[entry.url] = bool(future.result())
+                except Exception:
+                    health[entry.url] = False
 
-        if quality_score(entry) > quality_score(current):
-            entry.origins = origins
-            best[key] = entry
-        else:
-            current.origins = origins
+    selected: list[Entry] = []
 
-    return list(best.values())
+    for candidates in grouped.values():
+        origins = set().union(*(entry.origins for entry in candidates))
+        ranked = sorted(candidates, key=quality_score, reverse=True)
+
+        healthy = [entry for entry in ranked if health.get(entry.url) is True]
+        chosen = healthy[0] if healthy else ranked[0]
+        chosen.origins = origins
+        selected.append(chosen)
+
+        if len(candidates) > 1 and should_probe_group(candidates):
+            ok_count = sum(1 for entry in candidates if health.get(entry.url) is True)
+            name = clean_visible_name(chosen.display_name)
+            if ok_count:
+                print(f"  OK {name}: {ok_count}/{len(candidates)} alternativas responden")
+            else:
+                print(f"  AVISO {name}: ninguna alternativa respondio al test; se conserva la mejor candidata")
+
+    return selected
 
 
 def group_of(entry: Entry) -> str:
