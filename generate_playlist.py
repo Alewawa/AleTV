@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-IPTV curado v4: canales nacionales del Peru + Arequipa + deportes.
+IPTV curado v5: canales nacionales del Peru + Arequipa + deportes.
 
 Fuentes oficiales de iptv-org:
   Peru (fuente completa con todas las alternativas):
@@ -67,6 +67,9 @@ SPORTS_URL = "https://iptv-org.github.io/iptv/categories/sports.m3u"
 OUTPUT = "playlist.m3u"
 
 # IMPORTANTE:
+# La v5 prioriza explicitamente las alternativas HTTPS/CDN de los canales
+# peruanos principales cuando iptv-org publica mas de una URL.
+#
 # Usamos streams/pe.m3u y no countries/pe.m3u porque la playlist por pais
 # puede venir ya seleccionada/curada. El archivo streams/pe.m3u contiene
 # las alternativas originales de cada canal (America, Panamericana, ATV,
@@ -223,14 +226,61 @@ DEFAULT_USER_AGENT = (
 # Estas reglas NO agregan streams nuevos. Solo ordenan las alternativas que
 # ya publica iptv-org.
 CHANNEL_HOST_PREFERENCES = {
-    # America: priorizar la señal HTTPS distribuida por Bitel.
+    # Principales nacionales.
     "americatelevision.pe": [
         "live-bd1.tv360.bitel.com.pe",
-        "tv360.bitel.com.pe",
         "bantel-cdn1.iptvperu.tv",
     ],
-    # Panamericana: priorizar el dominio antes que las IP directas.
+    "latina.pe": [
+        "redirector.rudo.video",
+    ],
+    "atv.pe": [
+        "d19e55ehz2il4i.cloudfront.net",
+        "d2b5h5wyivfnfl.cloudfront.net",
+    ],
     "panamericanatv.pe": [
+        "bantel-cdn1.iptvperu.tv",
+    ],
+    "tvperu.pe": [
+        "cdnhd.iblups.com",
+        "bantel-cdn1.iptvperu.tv",
+    ],
+
+    # Nacionales complementarios.
+    "atvplus.pe": [
+        "d26l0c7cli5gzs.cloudfront.net",
+        "bantel-cdn1.iptvperu.tv",
+    ],
+    "globaltv.pe": [
+        "cablered.iptvperu.tv",
+        "live-evg7.tv360.bitel.com.pe",
+        "bantel-cdn1.iptvperu.tv",
+    ],
+    "latele.pe": [
+        "cablered.iptvperu.tv",
+    ],
+    "canalipe.pe": [
+        "bantel-cdn1.iptvperu.tv",
+    ],
+    "tvperunoticias.pe": [
+        "bantel-cdn1.iptvperu.tv",
+    ],
+
+    # Señales Latina.
+    "latinaclasicos.pe": [
+        "redirector.rudo.video",
+    ],
+    "latinasclasicos.pe": [
+        "redirector.rudo.video",
+    ],
+    "latinanoticias247.pe": [
+        "dai.google.com",
+        "redirector.rudo.video",
+    ],
+
+    # Arequipa.
+    "atvsur.pe": [
+        "dnhmqt6n0lkaq.cloudfront.net",
         "bantel-cdn1.iptvperu.tv",
     ],
 }
@@ -240,6 +290,8 @@ PREFERRED_HOST_SUFFIXES = (
     "iptvperu.tv",
     "cloudfront.net",
     "rudo.video",
+    "iblups.com",
+    "google.com",
 )
 
 # No se bloquean: quedan como fallback cuando no existe una fuente mejor.
