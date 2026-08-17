@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-IPTV curado: canales nacionales del Peru + Arequipa + deportes.
+IPTV curado v3: canales nacionales del Peru + Arequipa + deportes.
 
 Fuentes oficiales de iptv-org:
   Peru:
@@ -207,6 +207,43 @@ DEFAULT_USER_AGENT = (
     "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36"
 )
 
+# ---------------------------------------------------------------------------
+# PREFERENCIAS DE FUENTE
+# ---------------------------------------------------------------------------
+# El probe se ejecuta desde GitHub Actions y una URL puede funcionar alli pero
+# fallar en el ISP/reproductor del usuario (o al reves). Por eso el probe ya no
+# decide por si solo: la calidad de la fuente tiene mayor peso.
+#
+# Estas reglas NO agregan streams nuevos. Solo ordenan las alternativas que
+# ya publica iptv-org.
+CHANNEL_HOST_PREFERENCES = {
+    # America: priorizar la señal HTTPS distribuida por Bitel.
+    "americatelevision.pe": [
+        "live-bd1.tv360.bitel.com.pe",
+        "tv360.bitel.com.pe",
+        "bantel-cdn1.iptvperu.tv",
+    ],
+    # Panamericana: priorizar el dominio antes que las IP directas.
+    "panamericanatv.pe": [
+        "bantel-cdn1.iptvperu.tv",
+    ],
+}
+
+PREFERRED_HOST_SUFFIXES = (
+    "tv360.bitel.com.pe",
+    "iptvperu.tv",
+    "cloudfront.net",
+    "rudo.video",
+)
+
+# No se bloquean: quedan como fallback cuando no existe una fuente mejor.
+LOW_PRIORITY_IPS = {
+    "45.171.108.253",
+    "190.93.224.42",
+    "177.234.249.178",
+    "187.102.210.46",
+}
+
 
 @dataclass
 class Entry:
@@ -358,19 +395,52 @@ def is_ip_host(url: str) -> bool:
         return False
 
 
+def url_preference_score(entry: Entry) -> int:
+    """Puntua la probabilidad de que una URL sea una buena opcion para IPTV."""
+    parsed = urllib.parse.urlsplit(entry.url)
+    host = (parsed.hostname or "").lower()
+    score = 0
+
+    preferred_hosts = CHANNEL_HOST_PREFERENCES.get(entry.base_tvg_id, [])
+    for index, preferred in enumerate(preferred_hosts):
+        if host == preferred or host.endswith("." + preferred):
+            score += 1200 - (index * 80)
+            break
+
+    # HTTPS > HTTP.
+    if parsed.scheme.lower() == "https":
+        score += 350
+
+    # Dominio > IP directa.
+    if host and not is_ip_host(entry.url):
+        score += 180
+
+    if any(
+        host == suffix or host.endswith("." + suffix)
+        for suffix in PREFERRED_HOST_SUFFIXES
+    ):
+        score += 120
+
+    # Mirrors por IP quedan como ultimo recurso.
+    if host in LOW_PRIORITY_IPS:
+        score -= 180
+
+    return score
+
+
 def quality_score(entry: Entry) -> int:
+    """
+    Ranking base de una alternativa.
+
+    La estructura de la URL pesa mas que una pequena diferencia de resolucion.
+    """
     text = " ".join([entry.extinf, *entry.extra_lines, entry.url]).lower()
-    score = resolution_score(text)
+    score = resolution_score(text) // 2
 
     if re.search(r"@hd(?:$|\")", entry.tvg_id, re.I):
-        score += 25
-
-    if entry.url.lower().startswith("https://"):
         score += 20
 
-    if not is_ip_host(entry.url):
-        score += 5
-
+    score += url_preference_score(entry)
     return score
 
 
@@ -498,7 +568,7 @@ def choose_best(entries: list[Entry]) -> list[Entry]:
     for entry in entries:
         grouped.setdefault(canonical_key(entry), []).append(entry)
 
-    # Solo hace falta probar canales que tengan alternativas.
+    # Probamos alternativas peruanas/Arequipa como informacion secundaria.
     probe_candidates: list[Entry] = []
     for candidates in grouped.values():
         if len(candidates) > 1 and should_probe_group(candidates):
@@ -516,24 +586,34 @@ def choose_best(entries: list[Entry]) -> list[Entry]:
                 except Exception:
                     health[entry.url] = False
 
+    def final_score(entry: Entry) -> int:
+        score = quality_score(entry)
+
+        # El runner de GitHub solo suma/resta un poco; ya no manda.
+        if entry.url in health:
+            score += 70 if health[entry.url] else -20
+
+        return score
+
     selected: list[Entry] = []
 
     for candidates in grouped.values():
         origins = set().union(*(entry.origins for entry in candidates))
-        ranked = sorted(candidates, key=quality_score, reverse=True)
-
-        healthy = [entry for entry in ranked if health.get(entry.url) is True]
-        chosen = healthy[0] if healthy else ranked[0]
+        ranked = sorted(candidates, key=final_score, reverse=True)
+        chosen = ranked[0]
         chosen.origins = origins
         selected.append(chosen)
 
         if len(candidates) > 1 and should_probe_group(candidates):
-            ok_count = sum(1 for entry in candidates if health.get(entry.url) is True)
+            ok_count = sum(
+                1 for entry in candidates if health.get(entry.url) is True
+            )
             name = clean_visible_name(chosen.display_name)
-            if ok_count:
-                print(f"  OK {name}: {ok_count}/{len(candidates)} alternativas responden")
-            else:
-                print(f"  AVISO {name}: ninguna alternativa respondio al test; se conserva la mejor candidata")
+            host = urllib.parse.urlsplit(chosen.url).hostname or "sin-host"
+            print(
+                f"  {name}: elegida {host} "
+                f"(probe OK {ok_count}/{len(candidates)}, score {final_score(chosen)})"
+            )
 
     return selected
 
