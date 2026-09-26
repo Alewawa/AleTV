@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-IPTV curado v5: canales nacionales del Peru + Arequipa + deportes.
+IPTV curado v6: canales nacionales del Peru + Arequipa + deportes.
 
 Fuentes oficiales de iptv-org:
   Peru (fuente completa con todas las alternativas):
@@ -67,8 +67,10 @@ SPORTS_URL = "https://iptv-org.github.io/iptv/categories/sports.m3u"
 OUTPUT = "playlist.m3u"
 
 # IMPORTANTE:
-# La v5 prioriza explicitamente las alternativas HTTPS/CDN de los canales
+# La v6 prioriza explicitamente las alternativas HTTPS/CDN de los canales
 # peruanos principales cuando iptv-org publica mas de una URL.
+# Para TV Peru se prioriza Cablered, ya que la señal IBLUPS requiere
+# http-referrer y algunos reproductores IPTV no aplican esa directiva.
 #
 # Usamos streams/pe.m3u y no countries/pe.m3u porque la playlist por pais
 # puede venir ya seleccionada/curada. El archivo streams/pe.m3u contiene
@@ -242,6 +244,9 @@ CHANNEL_HOST_PREFERENCES = {
         "bantel-cdn1.iptvperu.tv",
     ],
     "tvperu.pe": [
+        # Cablered es HTTPS directo y no depende de http-referrer.
+        "cablered.iptvperu.tv",
+        # IBLUPS queda como segunda opcion porque requiere referrer.
         "cdnhd.iblups.com",
         "bantel-cdn1.iptvperu.tv",
     ],
