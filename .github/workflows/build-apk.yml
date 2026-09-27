@@ -31,34 +31,42 @@ jobs:
         with:
           packages: "platform-tools platforms;android-36 build-tools;36.0.0"
 
-      - name: Verify Android SDK
-        shell: bash
-        run: |
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
-          which sdkmanager
-          sdkmanager --version
-          sdkmanager --list_installed | head -n 80
-
       - name: Set up Gradle 9.6
         uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: "9.6.0"
           cache-provider: basic
 
-      - name: Verify Gradle
+      - name: Verify toolchain
         shell: bash
         run: |
-          which gradle
+          java -version
           gradle --version
+          sdkmanager --version
+          echo "ANDROID_HOME=$ANDROID_HOME"
 
       - name: Build AleTV APK
+        id: gradle_build
         working-directory: android-app
         shell: bash
         run: |
-          gradle :app:assembleDebug --no-daemon --stacktrace
+          set +e
+          gradle :app:assembleDebug --no-daemon --stacktrace 2>&1 | tee ../gradle-build.log
+          status=${PIPESTATUS[0]}
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          exit $status
+
+      - name: Upload Gradle log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AleTV-gradle-build-log
+          path: gradle-build.log
+          if-no-files-found: warn
+          retention-days: 30
 
       - name: Prepare APK
+        if: success()
         shell: bash
         run: |
           mkdir -p apk
@@ -66,6 +74,7 @@ jobs:
           ls -lh apk/AleTV-v1.apk
 
       - name: Upload APK artifact
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: AleTV-v1-FireTV
@@ -74,12 +83,12 @@ jobs:
           retention-days: 30
 
       - name: Publish APK in repository
+        if: success()
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add apk/AleTV-v1.apk
-
           if git diff --cached --quiet; then
             echo "APK unchanged."
           else
