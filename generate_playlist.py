@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-IPTV curado v6: canales nacionales del Peru + Arequipa + deportes.
+IPTV curado v7: canales nacionales del Peru + Arequipa + deportes.
 
 Fuentes oficiales de iptv-org:
   Peru (fuente completa con todas las alternativas):
@@ -65,6 +65,18 @@ PERU_URL = "https://raw.githubusercontent.com/iptv-org/iptv/master/streams/pe.m3
 AREQUIPA_URL = "https://iptv-org.github.io/iptv/subdivisions/pe-are.m3u"
 SPORTS_URL = "https://iptv-org.github.io/iptv/categories/sports.m3u"
 OUTPUT = "playlist.m3u"
+
+# ---------------------------------------------------------------------------
+# OVERRIDES DE COMPATIBILIDAD
+# ---------------------------------------------------------------------------
+# Algunas apps IPTV no interpretan directivas VLC como #EXTVLCOPT:http-referrer.
+# Para esos casos forzamos una URL HLS directa sin headers adicionales.
+COMPATIBILITY_OVERRIDES = {
+    "tvperu.pe": {
+        "url": "https://cablered.iptvperu.tv:1936/cablered/tvperu_new/playlist.m3u8",
+        "extra_lines": [],
+    },
+}
 
 # IMPORTANTE:
 # La v6 prioriza explicitamente las alternativas HTTPS/CDN de los canales
@@ -819,9 +831,18 @@ def main() -> None:
 
         emitted.add(key)
         group = group_of(entry)
+        override = COMPATIBILITY_OVERRIDES.get(entry.base_tvg_id)
+
         output_lines.append(clean_extinf(entry.extinf, group))
-        output_lines.extend(entry.extra_lines)
-        output_lines.append(entry.url)
+
+        if override:
+            # No heredamos #EXTVLCOPT ni referrers: buscamos maxima compatibilidad
+            # con reproductores IPTV que solo aceptan URL HLS directa.
+            output_lines.extend(override.get("extra_lines", []))
+            output_lines.append(override["url"])
+        else:
+            output_lines.extend(entry.extra_lines)
+            output_lines.append(entry.url)
 
     # 1) America, Latina, ATV, Panamericana, TV Peru, L1, L1 Max, etc.
     for entry in peru_featured:
