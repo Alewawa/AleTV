@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/black"
+    android:keepScreenOn="true">
+
+    <androidx.media3.ui.PlayerView
+        android:id="@+id/playerView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:resize_mode="fit"
+        app:show_buffering="when_playing"
+        app:use_controller="true" />
+
+    <TextView
+        android:id="@+id/channelTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|left"
+        android:layout_margin="24dp"
+        android:background="#99000000"
+        android:paddingLeft="18dp"
+        android:paddingTop="10dp"
+        android:paddingRight="18dp"
+        android:paddingBottom="10dp"
+        android:text="Canal"
+        android:textColor="@android:color/white"
+        android:textSize="22sp"
+        android:textStyle="bold" />
+
+    <LinearLayout
+        android:id="@+id/errorPanel"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#DD090D14"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="50dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/playbackErrorText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:text="No se pudo reproducir este canal."
+            android:textColor="@android:color/white"
+            android:textSize="25sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/playerRetryButton"
+            android:layout_width="260dp"
+            android:layout_height="64dp"
+            android:layout_marginTop="28dp"
+            android:background="@drawable/pill_button_selector"
+            android:focusable="true"
+            android:text="Reintentar"
+            android:textAllCaps="false"
+            android:textColor="@color/card_text_selector"
+            android:textSize="20sp" />
+
+        <Button
+            android:id="@+id/openExternalButton"
+            android:layout_width="260dp"
+            android:layout_height="64dp"
+            android:layout_marginTop="14dp"
+            android:background="@drawable/pill_button_selector"
+            android:focusable="true"
+            android:text="Abrir con VLC"
+            android:textAllCaps="false"
+            android:textColor="@color/card_text_selector"
+            android:textSize="20sp" />
+
+        <Button
+            android:id="@+id/backButton"
+            android:layout_width="260dp"
+            android:layout_height="64dp"
+            android:layout_marginTop="14dp"
+            android:background="@drawable/pill_button_selector"
+            android:focusable="true"
+            android:text="Volver a canales"
+            android:textAllCaps="false"
+            android:textColor="@color/card_text_selector"
+            android:textSize="20sp" />
+    </LinearLayout>
+
+</FrameLayout>

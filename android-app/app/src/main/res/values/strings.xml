@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AleTV</string>
+    <string name="loading_channels">Cargando canales...</string>
+    <string name="retry">Reintentar</string>
+    <string name="refresh">Actualizar</string>
+</resources>
