@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-IPTV curado v7: canales nacionales del Peru + Arequipa + deportes.
+IPTV curado v8: canales nacionales del Peru + Arequipa + deportes.
 
 Fuentes oficiales de iptv-org:
   Peru (fuente completa con todas las alternativas):
@@ -67,22 +67,38 @@ SPORTS_URL = "https://iptv-org.github.io/iptv/categories/sports.m3u"
 OUTPUT = "playlist.m3u"
 
 # ---------------------------------------------------------------------------
+# MODO IPTV SMARTERS
+# ---------------------------------------------------------------------------
+# Esta versión prioriza compatibilidad con el reproductor interno de
+# IPTV Smarters. Para canales problemáticos se prefieren URLs HLS simples
+# sin Referer, User-Agent especial ni puertos TLS no estándar.
+SMARTERS_COMPATIBILITY_MODE = True
+
+# ---------------------------------------------------------------------------
 # OVERRIDES DE COMPATIBILIDAD
 # ---------------------------------------------------------------------------
 # Algunas apps IPTV no interpretan directivas VLC como #EXTVLCOPT:http-referrer.
 # Para esos casos forzamos una URL HLS directa sin headers adicionales.
 COMPATIBILITY_OVERRIDES = {
+    # IPTV Smarters: usamos HLS simple por HTTP estándar, sin Referer,
+    # User-Agent especial ni puerto TLS no estándar.
     "tvperu.pe": {
-        "url": "https://cablered.iptvperu.tv:1936/cablered/tvperu_new/playlist.m3u8",
+        "url": "http://190.93.224.42/TV-PERU/index.m3u8",
+        "extra_lines": [],
+    },
+
+    # Mismo criterio para la señal de noticias de TV Perú.
+    "tvperunoticias.pe": {
+        "url": "http://190.93.224.42/TV-PERU-NOTICIAS/index.m3u8",
         "extra_lines": [],
     },
 }
 
 # IMPORTANTE:
-# La v6 prioriza explicitamente las alternativas HTTPS/CDN de los canales
+# La v8 mantiene las preferencias de fuentes y añade compatibilidad IPTV Smarters.
 # peruanos principales cuando iptv-org publica mas de una URL.
-# Para TV Peru se prioriza Cablered, ya que la señal IBLUPS requiere
-# http-referrer y algunos reproductores IPTV no aplican esa directiva.
+# Para TV Peru se fuerza una alternativa HLS simple por HTTP estándar,
+# ya que VLC tolera más variantes HLS que el reproductor interno de Smarters.
 #
 # Usamos streams/pe.m3u y no countries/pe.m3u porque la playlist por pais
 # puede venir ya seleccionada/curada. El archivo streams/pe.m3u contiene
@@ -625,6 +641,21 @@ def clean_extinf(extinf: str, group: str) -> str:
     return extinf
 
 
+def smarters_extra_lines(entry: Entry) -> list[str]:
+    """
+    Mantiene solo directivas extra que no suelen romper parsers simples.
+    Para overrides de compatibilidad no se usa esta función: allí se emite
+    únicamente EXTINF + URL.
+    """
+    if not SMARTERS_COMPATIBILITY_MODE:
+        return entry.extra_lines
+
+    # IPTV Smarters puede ignorar estas directivas específicas de VLC/Kodi.
+    # No las eliminamos de canales ya seleccionados que dependan de ellas
+    # salvo que haya un override explícito, para no romper canales que ya funcionan.
+    return entry.extra_lines
+
+
 def sports_region(entry: Entry) -> str | None:
     if entry.base_tvg_id in PERU_SPORTS_IDS or entry.country == "pe":
         return "Deportes Peru"
@@ -841,7 +872,7 @@ def main() -> None:
             output_lines.extend(override.get("extra_lines", []))
             output_lines.append(override["url"])
         else:
-            output_lines.extend(entry.extra_lines)
+            output_lines.extend(smarters_extra_lines(entry))
             output_lines.append(entry.url)
 
     # 1) America, Latina, ATV, Panamericana, TV Peru, L1, L1 Max, etc.

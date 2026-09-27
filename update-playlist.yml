@@ -30,25 +30,21 @@ jobs:
       - name: Generate playlist
         run: python generate_playlist.py
 
-      - name: Show selected Peru streams
+      - name: Check Smarters-compatible TV Peru
         shell: bash
         run: |
-          echo "=== America ==="
-          grep -A1 'America Television' playlist.m3u || true
+          echo "=== TV Peru ==="
+          grep -F -A2 ",TV Peru" playlist.m3u | head -n 3 || true
           echo
-          echo "=== Panamericana ==="
-          grep -A1 'Panamericana TV' playlist.m3u || true
+          echo "=== TV Peru Noticias ==="
+          grep -F -A2 ",TV Peru Noticias" playlist.m3u | head -n 3 || true
           echo
-          echo "=== Latina ==="
-          grep -A1 ',Latina$' playlist.m3u || true
-          echo
-          echo "=== ATV ==="
-          grep -A1 ',ATV$' playlist.m3u || true
-
-      - name: Show playlist changes
-        shell: bash
-        run: |
-          git diff -- playlist.m3u || true
+          if grep -F -A2 ",TV Peru" playlist.m3u | grep -q "190.93.224.42/TV-PERU/index.m3u8"; then
+            echo "OK: TV Peru usa la fuente compatible con Smarters."
+          else
+            echo "ERROR: TV Peru no usa la fuente esperada."
+            exit 1
+          fi
 
       - name: Commit updated playlist
         shell: bash
@@ -59,6 +55,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "playlist.m3u no cambio."
           else
-            git commit -m "Update IPTV playlist"
+            git commit -m "Update IPTV playlist for Smarters"
             git push
           fi
