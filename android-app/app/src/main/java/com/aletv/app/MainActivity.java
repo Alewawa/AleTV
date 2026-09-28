@@ -38,6 +38,7 @@ public final class MainActivity extends Activity implements ChannelAdapter.Liste
     private Button retryButton;
 
     private String selectedGroup = "";
+    private boolean initialAutoLaunchHandled = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -100,12 +101,19 @@ public final class MainActivity extends Activity implements ChannelAdapter.Liste
                 allChannels.addAll(channels);
 
                 buildCategories();
-                selectGroup("");
 
                 String suffix = fromCache ? " - copia guardada" : "";
                 statusText.setText(channels.size() + " canales disponibles" + suffix);
                 loadingPanel.setVisibility(View.GONE);
                 errorPanel.setVisibility(View.GONE);
+
+                if (!initialAutoLaunchHandled && tryOpenLastChannel()) {
+                    initialAutoLaunchHandled = true;
+                    return;
+                }
+
+                initialAutoLaunchHandled = true;
+                selectGroup("");
             }
 
             @Override
@@ -190,6 +198,20 @@ public final class MainActivity extends Activity implements ChannelAdapter.Liste
             if (holder != null) holder.itemView.requestFocus();
             else channelGrid.requestFocus();
         }, 120);
+    }
+
+    private boolean tryOpenLastChannel() {
+        int index = LastChannelStore.findIndex(this, allChannels);
+        if (index < 0) return false;
+
+        ArrayList<Channel> visibleChannels = new ArrayList<>(allChannels);
+
+        Intent intent = new Intent(this, PlayerActivity.class);
+        intent.putExtra("position", index);
+        intent.putExtra("channels", visibleChannels);
+        intent.putExtra("auto_last_channel", true);
+        startActivity(intent);
+        return true;
     }
 
     @Override

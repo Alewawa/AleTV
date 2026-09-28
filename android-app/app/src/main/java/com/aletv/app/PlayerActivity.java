@@ -143,6 +143,7 @@ public final class PlayerActivity extends Activity {
         if (channels == null || channels.isEmpty()) return;
 
         currentChannel = channels.get(currentIndex);
+        LastChannelStore.save(this, currentChannel);
         updateChannelOverlay();
         startPlayback();
     }
