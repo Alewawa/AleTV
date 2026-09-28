@@ -70,15 +70,15 @@ jobs:
         shell: bash
         run: |
           mkdir -p apk
-          cp android-app/app/build/outputs/apk/debug/app-debug.apk apk/AleTV-v1.apk
-          ls -lh apk/AleTV-v1.apk
+          cp android-app/app/build/outputs/apk/debug/app-debug.apk apk/AleTV-v1.2.apk
+          ls -lh apk/AleTV-v1.2.apk
 
       - name: Upload APK artifact
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: AleTV-v1-FireTV
-          path: apk/AleTV-v1.apk
+          name: AleTV-v1.2-FireTV
+          path: apk/AleTV-v1.2.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -88,7 +88,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add apk/AleTV-v1.apk
+          git add apk/AleTV-v1.2.apk
           if git diff --cached --quiet; then
             echo "APK unchanged."
           else
