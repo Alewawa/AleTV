@@ -3,6 +3,7 @@ package com.aletv.app;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.res.ColorStateList;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
 import android.view.ViewGroup;
@@ -22,7 +23,6 @@ import java.util.Set;
 
 public final class MainActivity extends Activity implements ChannelAdapter.Listener {
     private final List<Channel> allChannels = new ArrayList<>();
-    private final List<Button> categoryButtons = new ArrayList<>();
 
     private PlaylistRepository repository;
     private ChannelAdapter adapter;
@@ -114,9 +114,9 @@ public final class MainActivity extends Activity implements ChannelAdapter.Liste
                 errorPanel.setVisibility(View.VISIBLE);
                 errorText.setText(
                         "No se pudo cargar la lista.\n\n"
-                                + "Comprueba tu conexión y pulsa Reintentar."
+                                + "Comprueba tu conexion y pulsa Reintentar."
                 );
-                statusText.setText("Sin conexión");
+                statusText.setText("Sin conexion");
                 retryButton.requestFocus();
             }
         });
@@ -124,7 +124,6 @@ public final class MainActivity extends Activity implements ChannelAdapter.Liste
 
     private void buildCategories() {
         categoryContainer.removeAllViews();
-        categoryButtons.clear();
 
         addCategoryButton("Inicio", "");
 
@@ -168,8 +167,6 @@ public final class MainActivity extends Activity implements ChannelAdapter.Liste
 
         button.setTag(group);
         button.setOnClickListener(v -> selectGroup((String) v.getTag()));
-
-        categoryButtons.add(button);
         categoryContainer.addView(button);
     }
 
@@ -190,23 +187,18 @@ public final class MainActivity extends Activity implements ChannelAdapter.Liste
         channelGrid.postDelayed(() -> {
             RecyclerView.ViewHolder holder =
                     channelGrid.findViewHolderForAdapterPosition(0);
-            if (holder != null) {
-                holder.itemView.requestFocus();
-            } else {
-                channelGrid.requestFocus();
-            }
+            if (holder != null) holder.itemView.requestFocus();
+            else channelGrid.requestFocus();
         }, 120);
     }
 
     @Override
-    public void onChannelSelected(Channel channel) {
+    public void onChannelSelected(Channel channel, int position) {
+        ArrayList<Channel> visibleChannels = adapter.snapshot();
+
         Intent intent = new Intent(this, PlayerActivity.class);
-        intent.putExtra("name", channel.name);
-        intent.putExtra("group", channel.group);
-        intent.putExtra("url", channel.url);
-        intent.putExtra("userAgent", channel.userAgent);
-        intent.putExtra("referer", channel.referer);
-        intent.putExtra("origin", channel.origin);
+        intent.putExtra("position", position);
+        intent.putExtra("channels", visibleChannels);
         startActivity(intent);
     }
 
@@ -223,8 +215,6 @@ public final class MainActivity extends Activity implements ChannelAdapter.Liste
     }
 
     private int dp(int value) {
-        return Math.round(
-                value * getResources().getDisplayMetrics().density
-        );
+        return Math.round(value * getResources().getDisplayMetrics().density);
     }
 }

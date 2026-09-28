@@ -88,9 +88,10 @@ public final class PlaylistParser {
 
         String id = attr(header, "tvg-id");
         String group = attr(header, "group-title");
+        String logo = attr(header, "tvg-logo");
         name = cleanName(name);
 
-        return new Channel(id, name, group, url.trim(), userAgent, referer, origin);
+        return new Channel(id, name, group, url.trim(), logo, userAgent, referer, origin);
     }
 
     private static String attr(String header, String key) {

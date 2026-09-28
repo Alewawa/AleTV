@@ -7,9 +7,11 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.view.KeyEvent;
 import android.view.View;
 import android.view.Window;
 import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.annotation.Nullable;
@@ -22,6 +24,7 @@ import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory;
 import androidx.media3.ui.PlayerView;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -30,17 +33,30 @@ public final class PlayerActivity extends Activity {
     private ExoPlayer player;
     private View errorPanel;
     private TextView errorText;
+    private View channelOverlay;
+    private TextView channelTitle;
+    private ImageView playerLogo;
+    private TextView playerInitials;
 
-    private String channelName;
-    private String streamUrl;
-    private String userAgent;
-    private String referer;
-    private String origin;
+    private ArrayList<Channel> channels = new ArrayList<>();
+    private int currentIndex = 0;
+    private Channel currentChannel;
 
     private int automaticRetries = 0;
     private final Handler handler = new Handler(Looper.getMainLooper());
 
+    private final Runnable hideOverlayRunnable = () -> {
+        if (channelOverlay != null) {
+            channelOverlay.animate()
+                    .alpha(0f)
+                    .setDuration(250)
+                    .withEndAction(() -> channelOverlay.setVisibility(View.INVISIBLE))
+                    .start();
+        }
+    };
+
     @Override
+    @SuppressWarnings("unchecked")
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
@@ -48,21 +64,26 @@ public final class PlayerActivity extends Activity {
         setContentView(R.layout.activity_player);
         hideSystemUi();
 
-        channelName = safe(getIntent().getStringExtra("name"));
-        streamUrl = safe(getIntent().getStringExtra("url"));
-        userAgent = safe(getIntent().getStringExtra("userAgent"));
-        referer = safe(getIntent().getStringExtra("referer"));
-        origin = safe(getIntent().getStringExtra("origin"));
+        Object serialized = getIntent().getSerializableExtra("channels");
+        if (serialized instanceof ArrayList) {
+            channels = (ArrayList<Channel>) serialized;
+        }
+
+        currentIndex = getIntent().getIntExtra("position", 0);
+        if (currentIndex < 0) currentIndex = 0;
+        if (currentIndex >= channels.size()) currentIndex = Math.max(0, channels.size() - 1);
 
         playerView = findViewById(R.id.playerView);
         errorPanel = findViewById(R.id.errorPanel);
         errorText = findViewById(R.id.playbackErrorText);
-        TextView title = findViewById(R.id.channelTitle);
+        channelOverlay = findViewById(R.id.channelOverlay);
+        channelTitle = findViewById(R.id.channelTitle);
+        playerLogo = findViewById(R.id.playerLogo);
+        playerInitials = findViewById(R.id.playerInitials);
+
         Button retry = findViewById(R.id.playerRetryButton);
         Button external = findViewById(R.id.openExternalButton);
         Button back = findViewById(R.id.backButton);
-
-        title.setText(channelName.isEmpty() ? "AleTV" : channelName);
 
         retry.setOnClickListener(v -> {
             automaticRetries = 0;
@@ -73,13 +94,75 @@ public final class PlayerActivity extends Activity {
         external.setOnClickListener(v -> openExternalPlayer());
         back.setOnClickListener(v -> finish());
 
-        startPlayback();
+        if (channels.isEmpty()) {
+            showError("No se recibio la lista de canales.");
+        } else {
+            loadCurrentChannel();
+        }
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         hideSystemUi();
+    }
+
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
+            int key = event.getKeyCode();
+
+            // Flecha arriba / Channel+ = canal siguiente.
+            if (key == KeyEvent.KEYCODE_DPAD_UP || key == KeyEvent.KEYCODE_CHANNEL_UP) {
+                switchChannel(+1);
+                return true;
+            }
+
+            // Flecha abajo / Channel- = canal anterior.
+            if (key == KeyEvent.KEYCODE_DPAD_DOWN || key == KeyEvent.KEYCODE_CHANNEL_DOWN) {
+                switchChannel(-1);
+                return true;
+            }
+        }
+
+        return super.dispatchKeyEvent(event);
+    }
+
+    private void switchChannel(int delta) {
+        if (channels == null || channels.isEmpty()) return;
+
+        int size = channels.size();
+        currentIndex = (currentIndex + delta + size) % size;
+
+        automaticRetries = 0;
+        errorPanel.setVisibility(View.GONE);
+        loadCurrentChannel();
+    }
+
+    private void loadCurrentChannel() {
+        if (channels == null || channels.isEmpty()) return;
+
+        currentChannel = channels.get(currentIndex);
+        updateChannelOverlay();
+        startPlayback();
+    }
+
+    private void updateChannelOverlay() {
+        if (currentChannel == null) return;
+
+        channelTitle.setText(
+                (currentIndex + 1) + "  " + currentChannel.name
+        );
+
+        LogoLoader.load(playerLogo, playerInitials, currentChannel);
+        showChannelOverlay();
+    }
+
+    private void showChannelOverlay() {
+        handler.removeCallbacks(hideOverlayRunnable);
+        channelOverlay.setAlpha(1f);
+        channelOverlay.setVisibility(View.VISIBLE);
+        handler.postDelayed(hideOverlayRunnable, 4200);
     }
 
     private void hideSystemUi() {
@@ -96,7 +179,7 @@ public final class PlayerActivity extends Activity {
     private void startPlayback() {
         releasePlayer();
 
-        if (streamUrl.isEmpty()) {
+        if (currentChannel == null || currentChannel.url.isEmpty()) {
             showError("Este canal no tiene una URL valida.");
             return;
         }
@@ -107,14 +190,18 @@ public final class PlayerActivity extends Activity {
                         .setConnectTimeoutMs(12000)
                         .setReadTimeoutMs(22000)
                         .setUserAgent(
-                                userAgent.isEmpty()
-                                        ? "Mozilla/5.0 (Android TV; AleTV/1.0)"
-                                        : userAgent
+                                currentChannel.userAgent.isEmpty()
+                                        ? "Mozilla/5.0 (Android TV; AleTV/1.2)"
+                                        : currentChannel.userAgent
                         );
 
         Map<String, String> headers = new HashMap<>();
-        if (!referer.isEmpty()) headers.put("Referer", referer);
-        if (!origin.isEmpty()) headers.put("Origin", origin);
+        if (!currentChannel.referer.isEmpty()) {
+            headers.put("Referer", currentChannel.referer);
+        }
+        if (!currentChannel.origin.isEmpty()) {
+            headers.put("Origin", currentChannel.origin);
+        }
         if (!headers.isEmpty()) {
             httpFactory.setDefaultRequestProperties(headers);
         }
@@ -144,17 +231,18 @@ public final class PlayerActivity extends Activity {
             public void onPlayerError(PlaybackException error) {
                 if (automaticRetries < 1) {
                     automaticRetries++;
-                    handler.postDelayed(PlayerActivity.this::startPlayback, 1600);
+                    handler.postDelayed(PlayerActivity.this::startPlayback, 1200);
                 } else {
                     showError(
-                            "No se pudo reproducir " + channelName
-                                    + ".\n\nPuedes reintentar o abrirlo con VLC."
+                            "No se pudo reproducir " + currentChannel.name
+                                    + ".\n\n↑ o ↓ para cambiar de canal.\n"
+                                    + "Tambien puedes reintentar o abrirlo con VLC."
                     );
                 }
             }
         });
 
-        player.setMediaItem(MediaItem.fromUri(streamUrl));
+        player.setMediaItem(MediaItem.fromUri(currentChannel.url));
         player.prepare();
         player.setPlayWhenReady(true);
     }
@@ -167,7 +255,9 @@ public final class PlayerActivity extends Activity {
     }
 
     private void openExternalPlayer() {
-        Uri uri = Uri.parse(streamUrl);
+        if (currentChannel == null || currentChannel.url.isEmpty()) return;
+
+        Uri uri = Uri.parse(currentChannel.url);
 
         Intent vlc = new Intent(Intent.ACTION_VIEW);
         vlc.setDataAndType(uri, "application/x-mpegURL");
@@ -199,10 +289,6 @@ public final class PlayerActivity extends Activity {
             player.release();
             player = null;
         }
-    }
-
-    private String safe(String value) {
-        return value == null ? "" : value;
     }
 
     @Override
