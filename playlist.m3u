@@ -15,7 +15,7 @@ http://45.4.1.201:8000/play/a1ai/index.m3u8
 #EXTINF:-1 tvg-id="L1Max.pe@SD" group-title="Deportes Peru",L1 Max
 https://cablered.iptvperu.tv:1936/cablered/liga1max.stream/playlist.m3u8
 #EXTINF:-1 tvg-id="MovistarDeportes.pe@SD" group-title="Deportes Peru",Movistar Deportes
-https://xyktmobile00.s.gy/TICK_MD
+http://195.178.110.110/movistar/index.m3u8
 #EXTINF:-1 tvg-id="CanalN.pe@SD" group-title="TV Peru",Canal N
 http://187.102.208.209:8000/play/a0az/index.m3u8
 #EXTINF:-1 tvg-id="ATVPlus.pe@SD" group-title="TV Peru",ATV+
