@@ -42,7 +42,7 @@ http://190.93.224.42/ATV-SUR/index.m3u8
 #EXTINF:-1 tvg-id="VisionSur.pe@SD" tvg-logo="https://i.imgur.com/AbZYWEQ.png" group-title="TV Arequipa",Vision Sur
 https://live-evg8.tv360.bitel.com.pe/bitel/visionsur/playlist.m3u8
 #EXTINF:-1 tvg-id="TyCSports.ar@SD" tvg-logo="https://upload.wikimedia.org/wikipedia/commons/thumb/5/54/TyC_Sports_logo.svg/960px-TyC_Sports_logo.svg.png" group-title="Deportes Latinoamerica",TyC Sports
-http://45.181.87.106/TYCSPORTSHD/index.m3u8
+https://amg26268-amg26268c14-freelivesports-emea-10267.playouts.now.amagi.tv/ts-us-e2-n2/playlist/amg26268-sportsstudio-tycsports-freelivesportsemea/playlist.m3u8
 #EXTINF:-1 tvg-id="ClaroSports.mx@SD" tvg-logo="https://i.imgur.com/n0kd17r.png" group-title="Deportes Latinoamerica",Claro Sports
 http://168.196.127.137:6001/play/a08r/index.m3u8
 #EXTINF:-1 tvg-id="WinSports.co@SD" tvg-logo="https://i.imgur.com/DuSSrHV.png" group-title="Deportes Latinoamerica",Win Sports
@@ -55,6 +55,8 @@ http://181.78.197.59:8000/play/a07z/index.m3u8
 http://190.83.2.182:8090/ESPN3/index.m3u8
 #EXTINF:-1 tvg-id="ESPN4.br@SD" tvg-logo="https://upload.wikimedia.org/wikipedia/commons/thumb/7/78/ESPN_4_logo.svg/960px-ESPN_4_logo.svg.png" group-title="Deportes Latinoamerica",ESPN 4
 http://181.78.197.59:8000/play/a07n/index.m3u8
+#EXTINF:-1 tvg-id="ESPNPremium.ar@HD" tvg-logo="https://upload.wikimedia.org/wikipedia/commons/thumb/a/a1/ESPN_Premium_logo.svg/960px-ESPN_Premium_logo.svg.png" group-title="Deportes Latinoamerica",ESPN Premium HD
+http://190.128.214.97:64333/play/a02i/index.m3u8
 #EXTINF:-1 tvg-id="FoxSports.ar@SD" tvg-logo="https://upload.wikimedia.org/wikipedia/commons/thumb/0/0c/FOX_Sports_logo.svg/960px-FOX_Sports_logo.svg.png" group-title="Deportes Latinoamerica",Fox Sports
 http://138.59.227.20:8000/play/a085/index.m3u8
 #EXTINF:-1 tvg-id="BandSports.br@SD" tvg-logo="https://i.imgur.com/EuPvzJe.png" group-title="Deportes Latinoamerica",Band Sports
