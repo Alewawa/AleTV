@@ -15,7 +15,7 @@ http://45.4.1.201:8000/play/a1ai/index.m3u8
 #EXTINF:-1 tvg-id="L1Max.pe@SD" group-title="Deportes Peru",L1 Max
 https://cablered.iptvperu.tv:1936/cablered/liga1max.stream/playlist.m3u8
 #EXTINF:-1 tvg-id="MovistarDeportes.pe@SD" group-title="Deportes Peru",Movistar Deportes
-http://195.178.110.110/movistar/index.m3u8
+http://170.244.209.30:8000/play/a1i8/index.m3u8
 #EXTINF:-1 tvg-id="CanalN.pe@SD" group-title="TV Peru",Canal N
 http://170.244.209.30:8000/play/a1ib/index.m3u8
 #EXTINF:-1 tvg-id="ATVPlus.pe@SD" group-title="TV Peru",ATV+
@@ -82,6 +82,8 @@ http://195.178.110.110/sportv/index.m3u8
 http://195.178.110.110/sportv2/index.m3u8
 #EXTINF:-1 tvg-id="SporTV3.br@SD" tvg-logo="https://i.imgur.com/mWOR8pi.png" group-title="Deportes Latinoamerica",SporTV 3
 http://195.178.110.110/sportv3/index.m3u8
+#EXTINF:-1 tvg-id="DeporTV.ar@SD" tvg-logo="https://i.imgur.com/THk9ARS.png" group-title="Deportes Latinoamerica",DeporTV
+http://158.172.155.130:8000/play/a09y/index.m3u8
 #EXTINF:-1 tvg-id="AS3SportTV.ve@SD" tvg-logo="https://i.ibb.co/bRmGbsyV/A3-SPORTTV.jpg" group-title="Deportes Latinoamerica",AS3 Sport TV
 https://streamtv.as3sport.online:3394/hybrid/play.m3u8
 #EXTINF:-1 tvg-id="AyMSports.mx@SD" tvg-logo="https://i.imgur.com/yu3Bpbd.png" group-title="Deportes Latinoamerica",AyM Sports
