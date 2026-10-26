@@ -131,6 +131,6 @@ https://live20.bozztv.com/dvrfl06/astv/astv-barca/index.m3u8
 #EXTINF:-1 tvg-id="RealMadridTV.es@SD" tvg-logo="https://i.imgur.com/5pMo7dL.png" group-title="Deportes Espana",Real Madrid TV (726p)
 https://rmtv.akamaized.net/hls/live/2043153/rmtv-es-web/master.m3u8
 #EXTINF:-1 tvg-id="RealMadridTVEnglish.es@SD" tvg-logo="https://i.imgur.com/5pMo7dL.png" group-title="Deportes Espana",Real Madrid TV English
-http://88.212.15.17/live/real_madrid_tv/index.m3u8
+http://88.212.15.50/live/real_madrid_tv/index.m3u8
 #EXTINF:-1 tvg-id="Teledeporte.es@SD" tvg-logo="https://i.ibb.co/0jxLdjnY/TDP.png" group-title="Deportes Espana",Teledeporte
 https://rtve01p.origin.c21livecloud.com/live-origin/tdp-hls/bitrate_1.m3u8
