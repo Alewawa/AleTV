@@ -1,0 +1,31 @@
+name: Auditar canales IPTV
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '43 11 * * 0'
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+      - name: Preparar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Auditar Peru y Arequipa
+        run: python audit_streams.py --playlist playlist.m3u --output audit --timeout 8 --workers 8
+      - name: Guardar informe descargable
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AleTV-Informe-canales
+          path: audit/
+          if-no-files-found: warn
+          retention-days: 30
