@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-IPTV curado v9: canales nacionales del Peru + Arequipa + deportes.
+IPTV curado v10: canales nacionales del Peru + Arequipa + deportes.
 
 Fuentes oficiales de iptv-org:
   Peru (fuente completa con todas las alternativas):
@@ -56,6 +56,9 @@ from __future__ import annotations
 import concurrent.futures
 import csv
 import os
+import json
+import shutil
+import subprocess
 import ipaddress
 import re
 import unicodedata
@@ -93,6 +96,11 @@ RECENTLY_VERIFIED = {
 
 # Informe descargable opcional del generador.
 SELECTION_REPORT = "source_selection_report.csv"
+BACKUPS_BY_KEY = {}
+BACKUP_DIRECTIVE = "#ALETV-ALT-URL:"
+MAX_BACKUPS = 3
+# Esta URL de Canal N da imagen sin audio en Fire TV del usuario.
+REPORTED_SILENT_STREAMS = {"canaln.pe": {"http://190.108.91.206:9050/play/a0bd/index.m3u8"}}
 
 # IMPORTANTE:
 # La v8 mantiene las preferencias de fuentes y añade compatibilidad IPTV Smarters.
@@ -336,6 +344,17 @@ LOW_PRIORITY_IPS = {
 }
 
 
+def extinf_comma_index(line: str) -> int:
+    """Encuentra la coma fuera de comillas (User-Agent puede contener comas)."""
+    quoted = False
+    for idx, char in enumerate(line):
+        if char == '"':
+            quoted = not quoted
+        elif char == ',' and not quoted:
+            return idx
+    return -1
+
+
 @dataclass
 class Entry:
     extinf: str
@@ -354,7 +373,8 @@ class Entry:
 
     @property
     def display_name(self) -> str:
-        return self.extinf.split(",", 1)[1].strip() if "," in self.extinf else ""
+        comma = extinf_comma_index(self.extinf)
+        return self.extinf[comma + 1:].strip() if comma >= 0 else ""
 
     @property
     def country(self) -> str:
@@ -609,6 +629,40 @@ def probe_stream(entry: Entry) -> bool:
         return False
 
 
+def apparently_wrong_channel(entry: Entry) -> bool:
+    """La ruta /ATV/ para ATV+ puede reproducir un canal distinto."""
+    if entry.base_tvg_id != "atvplus.pe":
+        return False
+    path = urllib.parse.urlsplit(entry.url).path.lower()
+    return path.startswith("/atv/") and not any(
+        marker in path for marker in ("atvplus", "atv-plus", "atv_plus")
+    )
+
+
+def probe_audio(entry: Entry) -> str:
+    """Comprobar pista de audio sin asumir que equivale a sonido audible."""
+    if not shutil.which("ffprobe"):
+        return "no_evaluado"
+    command = [
+        "ffprobe", "-v", "error", "-rw_timeout", "8000000",
+        "-analyzeduration", "3000000", "-probesize", "1500000",
+        "-show_entries", "stream=codec_type,codec_name", "-of", "json",
+        entry.url,
+    ]
+    try:
+        result = subprocess.run(command, capture_output=True, text=True, timeout=20)
+        if result.returncode != 0:
+            return "desconocido"
+        streams = json.loads(result.stdout).get("streams", [])
+        if any(row.get("codec_type") == "audio" for row in streams):
+            return "audio_detectado"
+        if any(row.get("codec_type") == "video" for row in streams):
+            return "video_sin_pista_audio"
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        pass
+    return "desconocido"
+
+
 def should_probe_group(candidates: list[Entry]) -> bool:
     # Solo validamos activamente Peru y Arequipa. Para deportes extranjeros
     # no conviene filtrar desde GitHub, porque algunos streams pueden tener
@@ -648,7 +702,7 @@ def replace_group_title(extinf: str, group: str) -> str:
             flags=re.I,
         )
 
-    comma = extinf.find(",")
+    comma = extinf_comma_index(extinf)
     if comma == -1:
         return extinf + f' group-title="{group}"'
 
@@ -658,9 +712,9 @@ def replace_group_title(extinf: str, group: str) -> str:
 def clean_extinf(extinf: str, group: str) -> str:
     extinf = replace_group_title(extinf, group)
 
-    if "," in extinf:
-        metadata, name = extinf.split(",", 1)
-        return metadata + "," + clean_visible_name(name)
+    comma = extinf_comma_index(extinf)
+    if comma >= 0:
+        return extinf[:comma] + "," + clean_visible_name(extinf[comma + 1:])
 
     return extinf
 
@@ -727,55 +781,79 @@ def choose_best(entries: list[Entry]) -> list[Entry]:
                 except Exception:
                     health[url] = False
 
+    # Comprobar audio solo para Canal N: primero verificar que existe una pista.
+    audio_health: dict[str, str] = {}
+    for key, candidates in grouped.items():
+        if key == "id:canaln.pe":
+            with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+                futures = {pool.submit(probe_audio, e): e.url for e in candidates}
+                for future in concurrent.futures.as_completed(futures):
+                    audio_health[futures[future]] = future.result()
+
+    global BACKUPS_BY_KEY
+    BACKUPS_BY_KEY = {}
     selection_rows: list[dict[str, str]] = []
     selected: list[Entry] = []
     for key, candidates in grouped.items():
         origins = set().union(*(entry.origins for entry in candidates))
-        verified = [e for e in candidates if health.get(e.url) is True]
+        eligible = [e for e in candidates if not apparently_wrong_channel(e)] or candidates
+        verified = [e for e in eligible if health.get(e.url) is True]
         previous_url = previous.get(key, "")
 
+        def score(e: Entry) -> tuple[int, int, int, int]:
+            audio = audio_health.get(e.url, "desconocido")
+            if key == "id:canaln.pe":
+                has_audio = 2 if audio == "audio_detectado" else (0 if audio == "video_sin_pista_audio" else 1)
+                not_reported_silent = e.url not in REPORTED_SILENT_STREAMS.get(e.base_tvg_id, set())
+                return has_audio, int(not_reported_silent), int(health.get(e.url) is True), quality_score(e)
+            return 1, int(health.get(e.url) is True), int(e.url == RECENTLY_VERIFIED.get(e.base_tvg_id)), quality_score(e)
+
         if verified:
-            # Nunca priorizar un host preferido que fallo sobre una fuente
-            # que si entrego manifiesto y un fragmento HLS.
-            chosen = max(
-                verified,
-                key=lambda e: (
-                    e.url == RECENTLY_VERIFIED.get(e.base_tvg_id),
-                    quality_score(e),
-                ),
-            )
-            reason = "segmento_ok_desde_github"
+            if key == "id:canaln.pe":
+                with_audio = [e for e in eligible if audio_health.get(e.url) == "audio_detectado"]
+                other = [e for e in eligible if e.url not in REPORTED_SILENT_STREAMS.get(e.base_tvg_id, set())]
+                chosen = max(with_audio or other or verified, key=score)
+            else:
+                chosen = max(verified, key=score)
+            reason = "segmento_ok_desde_github" if health.get(chosen.url) else "prueba_alternativa_audio_sin_verificar"
         else:
-            # No degradar una lista ya usada solo por errores que pueden ser
-            # geo/ISP o filtrado de IP del runner. No afirmamos que funcione.
-            previous_candidates = [e for e in candidates if e.url == previous_url]
+            previous_candidates = [e for e in eligible if e.url == previous_url]
             if previous_candidates:
                 chosen = previous_candidates[0]
                 reason = "sin_fuente_verificada_conserva_anterior"
             else:
-                chosen = max(candidates, key=quality_score)
+                chosen = max(eligible, key=quality_score)
                 reason = "sin_fuente_verificada_preferencia_estatica"
+
+        backups = []
+        seen_urls = {chosen.url}
+        for alt in sorted(eligible, key=score, reverse=True):
+            if alt.url not in seen_urls and len(backups) < MAX_BACKUPS:
+                backups.append(alt)
+                seen_urls.add(alt.url)
+        BACKUPS_BY_KEY[key] = backups
 
         chosen.origins = origins
         selected.append(chosen)
         for entry in candidates:
+            status = (
+                "segmento_ok" if health.get(entry.url) is True else
+                "sin_segmento" if entry.url in health else "sin_prueba"
+            )
+            if apparently_wrong_channel(entry):
+                status = "identidad_atvplus_dudosa"
             selection_rows.append({
                 "canal": clean_visible_name(entry.display_name),
                 "grupo": group_of(entry),
                 "url": entry.url,
-                "resultado_github": (
-                    "segmento_ok" if health.get(entry.url) is True else
-                    "sin_segmento" if entry.url in health else "sin_prueba"
-                ),
+                "resultado_github": status,
+                "audio_github": audio_health.get(entry.url, "no_evaluado"),
                 "seleccionada": "SI" if entry is chosen else "NO",
                 "criterio": reason if entry is chosen else "alternativa",
             })
-        if should_probe_group(candidates):
-            ok_count = sum(health.get(e.url) is True for e in candidates)
-            print(f"  {clean_visible_name(chosen.display_name)}: {ok_count}/{len(candidates)} fuentes verificadas; {reason}")
 
     with open(SELECTION_REPORT, "w", encoding="utf-8-sig", newline="") as file:
-        writer = csv.DictWriter(file, fieldnames=["canal", "grupo", "url", "resultado_github", "seleccionada", "criterio"])
+        writer = csv.DictWriter(file, fieldnames=["canal", "grupo", "url", "resultado_github", "audio_github", "seleccionada", "criterio"])
         writer.writeheader()
         writer.writerows(selection_rows)
     return selected
@@ -923,6 +1001,8 @@ def main() -> None:
         # Emitir exactamente la fuente elegida, sin reemplazarla por una URL
         # fija al final. Las directivas HTTP del stream se conservan.
         output_lines.extend(smarters_extra_lines(entry))
+        for alternate in BACKUPS_BY_KEY.get(key, []):
+            output_lines.append(BACKUP_DIRECTIVE + alternate.url)
         output_lines.append(entry.url)
 
     # 1) America, Latina, ATV, Panamericana, TV Peru, L1, L1 Max, etc.
