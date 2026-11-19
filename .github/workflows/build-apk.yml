@@ -2,6 +2,11 @@ name: Build AleTV APK
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "android-app/**"
+      - ".github/workflows/build-apk.yml"
   push:
     branches:
       - main
@@ -31,10 +36,10 @@ jobs:
         with:
           packages: "platform-tools platforms;android-36 build-tools;36.0.0"
 
-      - name: Set up Gradle 9.6
+      - name: Set up Gradle 8.13
         uses: gradle/actions/setup-gradle@v6
         with:
-          gradle-version: "9.6.0"
+          gradle-version: "8.13"
           cache-provider: basic
 
       - name: Verify toolchain
@@ -70,25 +75,25 @@ jobs:
         shell: bash
         run: |
           mkdir -p apk
-          cp android-app/app/build/outputs/apk/debug/app-debug.apk apk/AleTV-v1.3.apk
-          ls -lh apk/AleTV-v1.3.apk
+          cp android-app/app/build/outputs/apk/debug/app-debug.apk apk/AleTV-v1.4.apk
+          ls -lh apk/AleTV-v1.4.apk
 
       - name: Upload APK artifact
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: AleTV-v1.3-FireTV
-          path: apk/AleTV-v1.3.apk
+          name: AleTV-v1.4-FireTV
+          path: apk/AleTV-v1.4.apk
           if-no-files-found: error
           retention-days: 30
 
       - name: Publish APK in repository
-        if: success()
+        if: success() && github.event_name != 'pull_request'
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add apk/AleTV-v1.3.apk
+          git add apk/AleTV-v1.4.apk
           if git diff --cached --quiet; then
             echo "APK unchanged."
           else

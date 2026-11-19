@@ -21,6 +21,7 @@ import androidx.media3.common.Player;
 import androidx.media3.datasource.DefaultDataSource;
 import androidx.media3.datasource.DefaultHttpDataSource;
 import androidx.media3.exoplayer.ExoPlayer;
+import androidx.media3.exoplayer.DefaultRenderersFactory;
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory;
 import androidx.media3.ui.PlayerView;
 
@@ -43,6 +44,8 @@ public final class PlayerActivity extends Activity {
     private Channel currentChannel;
 
     private int automaticRetries = 0;
+    private int sourceIndex = 0;
+    private String activeUrl = "";
     private final Handler handler = new Handler(Looper.getMainLooper());
 
     private final Runnable hideOverlayRunnable = () -> {
@@ -87,6 +90,7 @@ public final class PlayerActivity extends Activity {
 
         retry.setOnClickListener(v -> {
             automaticRetries = 0;
+            sourceIndex = 0;
             errorPanel.setVisibility(View.GONE);
             startPlayback();
         });
@@ -123,6 +127,16 @@ public final class PlayerActivity extends Activity {
                 switchChannel(-1);
                 return true;
             }
+            // OK cambia a otra señal del mismo canal si existe.
+            if ((key == KeyEvent.KEYCODE_DPAD_CENTER || key == KeyEvent.KEYCODE_ENTER)
+                    && errorPanel != null && errorPanel.getVisibility() != View.VISIBLE
+                    && currentChannel != null && !currentChannel.backupUrls.isEmpty()) {
+                sourceIndex = (sourceIndex + 1) % (currentChannel.backupUrls.size() + 1);
+                automaticRetries = 0;
+                showSourceOverlay();
+                startPlayback();
+                return true;
+            }
         }
 
         return super.dispatchKeyEvent(event);
@@ -135,6 +149,7 @@ public final class PlayerActivity extends Activity {
         currentIndex = (currentIndex + delta + size) % size;
 
         automaticRetries = 0;
+        sourceIndex = 0;
         errorPanel.setVisibility(View.GONE);
         loadCurrentChannel();
     }
@@ -143,6 +158,7 @@ public final class PlayerActivity extends Activity {
         if (channels == null || channels.isEmpty()) return;
 
         currentChannel = channels.get(currentIndex);
+        sourceIndex = 0;
         LastChannelStore.save(this, currentChannel);
         updateChannelOverlay();
         startPlayback();
@@ -154,6 +170,12 @@ public final class PlayerActivity extends Activity {
         channelTitle.setText(
                 (currentIndex + 1) + "  " + currentChannel.name
         );
+        TextView hint = findViewById(R.id.channelHint);
+        if (hint != null) {
+            hint.setText(currentChannel.backupUrls.isEmpty()
+                    ? "↑ siguiente    ↓ anterior"
+                    : "↑ siguiente    ↓ anterior    OK: otra señal");
+        }
 
         LogoLoader.load(playerLogo, playerInitials, currentChannel);
         showChannelOverlay();
@@ -177,10 +199,40 @@ public final class PlayerActivity extends Activity {
         );
     }
 
+    private void showSourceOverlay() {
+        if (currentChannel == null) return;
+        channelTitle.setText((currentIndex + 1) + " " + currentChannel.name
+                + "  (señal " + (sourceIndex + 1) + "/"
+                + (currentChannel.backupUrls.size() + 1) + ")");
+        showChannelOverlay();
+    }
+
+    private String sourceAt(int index) {
+        if (currentChannel == null) return "";
+        if (index == 0) return currentChannel.url;
+        int alt = index - 1;
+        if (alt >= 0 && alt < currentChannel.backupUrls.size()) {
+            return currentChannel.backupUrls.get(alt);
+        }
+        return "";
+    }
+
+    private boolean tryNextSource() {
+        String next = sourceAt(sourceIndex + 1);
+        if (next.isEmpty()) return false;
+        sourceIndex++;
+        automaticRetries = 0;
+        errorPanel.setVisibility(View.GONE);
+        showSourceOverlay();
+        startPlayback();
+        return true;
+    }
+
     private void startPlayback() {
         releasePlayer();
 
-        if (currentChannel == null || currentChannel.url.isEmpty()) {
+        activeUrl = sourceAt(sourceIndex);
+        if (activeUrl.isEmpty()) {
             showError("Este canal no tiene una URL valida.");
             return;
         }
@@ -213,37 +265,41 @@ public final class PlayerActivity extends Activity {
         DefaultMediaSourceFactory mediaSourceFactory =
                 new DefaultMediaSourceFactory(dataSourceFactory);
 
-        player = new ExoPlayer.Builder(this)
+        player = new ExoPlayer.Builder(
+                    this,
+                    new DefaultRenderersFactory(this).setEnableDecoderFallback(true)
+                )
                 .setMediaSourceFactory(mediaSourceFactory)
                 .build();
 
         playerView.setPlayer(player);
+        final ExoPlayer playing = player;
 
         player.addListener(new Player.Listener() {
             @Override
             public void onPlaybackStateChanged(int playbackState) {
                 if (playbackState == Player.STATE_READY) {
-                    automaticRetries = 0;
                     errorPanel.setVisibility(View.GONE);
                 }
             }
 
             @Override
             public void onPlayerError(PlaybackException error) {
+                if (player != playing) return;
                 if (automaticRetries < 1) {
                     automaticRetries++;
-                    handler.postDelayed(PlayerActivity.this::startPlayback, 1200);
-                } else {
-                    showError(
-                            "No se pudo reproducir " + currentChannel.name
-                                    + ".\n\n↑ o ↓ para cambiar de canal.\n"
-                                    + "Tambien puedes reintentar o abrirlo con VLC."
-                    );
+                    handler.postDelayed(() -> {
+                        if (player == playing) startPlayback();
+                    }, 1200);
+                } else if (!tryNextSource()) {
+                    showError("No se pudo reproducir " + currentChannel.name
+                            + ".\n\nSe probaron las fuentes disponibles.\n"
+                            + "↑ o ↓ para cambiar de canal o abrir con VLC.");
                 }
             }
         });
 
-        player.setMediaItem(MediaItem.fromUri(currentChannel.url));
+        player.setMediaItem(MediaItem.fromUri(activeUrl));
         player.prepare();
         player.setPlayWhenReady(true);
     }
@@ -258,7 +314,7 @@ public final class PlayerActivity extends Activity {
     private void openExternalPlayer() {
         if (currentChannel == null || currentChannel.url.isEmpty()) return;
 
-        Uri uri = Uri.parse(currentChannel.url);
+        Uri uri = Uri.parse(activeUrl.isEmpty() ? currentChannel.url : activeUrl);
 
         Intent vlc = new Intent(Intent.ACTION_VIEW);
         vlc.setDataAndType(uri, "application/x-mpegURL");

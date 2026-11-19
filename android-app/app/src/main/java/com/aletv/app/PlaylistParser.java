@@ -21,6 +21,7 @@ public final class PlaylistParser {
         String userAgent = "";
         String referer = "";
         String origin = "";
+        ArrayList<String> backups = new ArrayList<>();
 
         for (String raw : lines) {
             String line = raw.trim();
@@ -31,6 +32,16 @@ public final class PlaylistParser {
                 userAgent = "";
                 referer = "";
                 origin = "";
+                backups.clear();
+                continue;
+            }
+
+            if (extinf != null && line.startsWith("#ALETV-ALT-URL:")) {
+                String alternative = line.substring("#ALETV-ALT-URL:".length()).trim();
+                if ((alternative.startsWith("http://") || alternative.startsWith("https://"))
+                        && !backups.contains(alternative) && backups.size() < 3) {
+                    backups.add(alternative);
+                }
                 continue;
             }
 
@@ -61,7 +72,7 @@ public final class PlaylistParser {
             }
 
             if (extinf != null && !line.startsWith("#")) {
-                Channel c = parseEntry(extinf, line, userAgent, referer, origin);
+                Channel c = parseEntry(extinf, line, new ArrayList<>(backups), userAgent, referer, origin);
                 if (c != null && !c.url.isEmpty()) {
                     channels.add(c);
                 }
@@ -69,6 +80,7 @@ public final class PlaylistParser {
                 userAgent = "";
                 referer = "";
                 origin = "";
+                backups.clear();
             }
         }
 
@@ -78,11 +90,12 @@ public final class PlaylistParser {
     private static Channel parseEntry(
             String extinf,
             String url,
+            ArrayList<String> backups,
             String userAgent,
             String referer,
             String origin
     ) {
-        int comma = extinf.indexOf(',');
+        int comma = metadataComma(extinf);
         String name = comma >= 0 ? extinf.substring(comma + 1).trim() : "Canal";
         String header = comma >= 0 ? extinf.substring(0, comma) : extinf;
 
@@ -91,7 +104,17 @@ public final class PlaylistParser {
         String logo = attr(header, "tvg-logo");
         name = cleanName(name);
 
-        return new Channel(id, name, group, url.trim(), logo, userAgent, referer, origin);
+        return new Channel(id, name, group, url.trim(), logo, backups, userAgent, referer, origin);
+    }
+
+    private static int metadataComma(String line) {
+        boolean quoted = false;
+        for (int i = 0; i < line.length(); i++) {
+            char c = line.charAt(i);
+            if (c == '"') quoted = !quoted;
+            else if (c == ',' && !quoted) return i;
+        }
+        return -1;
     }
 
     private static String attr(String header, String key) {
