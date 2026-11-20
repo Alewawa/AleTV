@@ -13,13 +13,13 @@ https://redirector.rudo.video/hls-video/567ffde3fa319fadf3419efda25619456231dfea
 http://190.93.224.42/ATV/index.m3u8
 #EXTINF:-1 tvg-id="PanamericanaTV.pe@SD" group-title="TV Peru",Panamericana TV
 #ALETV-ALT-URL:http://45.171.108.253:8888/PANAMERICANA/index.m3u8
-#ALETV-ALT-URL:http://190.93.224.42/PANAMERICANA/index.m3u8
 #ALETV-ALT-URL:http://bantel-cdn1.iptvperu.tv:1935/btnscrtn/panamericana.stream/playlist.m3u8
+#ALETV-ALT-URL:http://190.93.224.42/PANAMERICANA/index.m3u8
 http://181.224.200.5:2277/play/kkio/index.m3u8
 #EXTINF:-1 tvg-id="TVPeru.pe@SD" group-title="TV Peru",TV Peru
 #ALETV-ALT-URL:https://cdnhd3.iblups.net/hls/2ee85c7a0aff45d4b0f05552d81cadb07.m3u8
 #ALETV-ALT-URL:http://181.224.200.5:2277/play/a0dx/index.m3u8
-#ALETV-ALT-URL:http://190.93.224.42/VIVA-TV/index.m3u8
+#ALETV-ALT-URL:https://cdnhd.iblups.com/hls/777b4d4cc0984575a7d14f6ee57dbcaf7.m3u8
 http://190.93.224.42/TV-PERU/index.m3u8
 #EXTINF:-1 tvg-id="L1.pe@SD" group-title="Deportes Peru",L1
 http://45.4.1.201:8000/play/a1ai/index.m3u8
@@ -36,9 +36,9 @@ http://190.108.91.206:9050/play/a0bd/index.m3u8
 #ALETV-ALT-URL:http://bantel-cdn1.iptvperu.tv:1935/btnscrtn/atvplus.stream/playlist.m3u8
 http://190.93.224.42/ATV-PLUS/index.m3u8
 #EXTINF:-1 tvg-id="GlobalTV.pe@SD" group-title="TV Peru",Global TV
-#ALETV-ALT-URL:http://190.93.224.42/GLOBAL/index.m3u8
 #ALETV-ALT-URL:https://cablered.iptvperu.tv:1936/cablered/global.stream/playlist.m3u8
 #ALETV-ALT-URL:http://bantel-cdn1.iptvperu.tv:1935/btnscrtn/global.stream/playlist.m3u8
+#ALETV-ALT-URL:http://190.93.224.42/GLOBAL/index.m3u8
 https://live-evg7.tv360.bitel.com.pe/bitel/global_abr/playlist.m3u8
 #EXTINF:-1 tvg-id="LaTele.pe@SD" group-title="TV Peru",La Tele
 #ALETV-ALT-URL:https://cablered.iptvperu.tv:1936/cablered/la_tele.stream/playlist.m3u8
