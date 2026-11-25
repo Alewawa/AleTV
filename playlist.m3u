@@ -35,9 +35,9 @@ http://190.108.91.206:9050/play/a0bd/index.m3u8
 #ALETV-ALT-URL:http://bantel-cdn1.iptvperu.tv:1935/btnscrtn/atvplus.stream/playlist.m3u8
 http://190.93.224.42/ATV-PLUS/index.m3u8
 #EXTINF:-1 tvg-id="GlobalTV.pe@SD" group-title="TV Peru",Global TV
+#ALETV-ALT-URL:http://190.93.224.42/GLOBAL/index.m3u8
 #ALETV-ALT-URL:https://cablered.iptvperu.tv:1936/cablered/global.stream/playlist.m3u8
 #ALETV-ALT-URL:http://bantel-cdn1.iptvperu.tv:1935/btnscrtn/global.stream/playlist.m3u8
-#ALETV-ALT-URL:http://190.93.224.42/GLOBAL/index.m3u8
 https://live-evg7.tv360.bitel.com.pe/bitel/global_abr/playlist.m3u8
 #EXTINF:-1 tvg-id="LaTele.pe@SD" group-title="TV Peru",La Tele
 #ALETV-ALT-URL:https://cablered.iptvperu.tv:1936/cablered/la_tele.stream/playlist.m3u8
